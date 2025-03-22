@@ -1,0 +1,6 @@
+This is a placeholder for the KSL model image.
+In a production application, this would be an actual PNG image file showing
+KSL hand signs or a related illustration.
+
+When integrating the app with actual assets, replace this file with a real
+image named ksl_placeholder.png 

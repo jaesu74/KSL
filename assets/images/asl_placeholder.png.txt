@@ -1,0 +1,6 @@
+This is a placeholder for the ASL model image.
+In a production application, this would be an actual PNG image file showing
+ASL hand signs or a related illustration.
+
+When integrating the app with actual assets, replace this file with a real
+image named asl_placeholder.png 
