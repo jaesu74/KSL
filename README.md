@@ -1,107 +1,110 @@
-# 수어 하자 (SueoHaja)
+# 수어 번역기 (Sign Language Translator)
 
-한국어 수화(수어)를 인식하여 텍스트 및 음성으로 번역해주는 모바일 앱입니다.
+수어 영상을 입력하면 그것이 의미하는 문장을 출력해주는 번역 시스템입니다. 이 프로젝트는 [bigdata-3team/Sign-Language-Translator](https://github.com/bigdata-3team/Sign-Language-Translator) 프로젝트를 기반으로 구현되었습니다.
 
-## 프로젝트 설명
+## 프로젝트 개요
 
-수어 하자(SueoHaja)는 카메라를 통해 수어 동작을 인식하고, 이를 텍스트와 음성으로 변환하여 사용자에게 제공하는 앱입니다. 청각장애인과 비장애인 간의 원활한 의사소통을 돕기 위해 개발되었습니다.
+수어 번역기는 CNN+LSTM 기반의 딥러닝 모델과 MediaPipe 손 랜드마크 감지 기술을 활용하여 수어를 인식하고 번역합니다. 대부분의 일반인들은 수어를 알지 못합니다. 수어 번역기는 일반인이 수어를 배우기 위한 시간과 비용을 들일 필요없이 손쉽게 농인들과 소통할 수 있는 장을 마련합니다.
 
-### 주요 기능
+## 기능
 
 - 실시간 수어 인식 및 번역
-- 번역된 텍스트의 음성 출력
-- 번역 기록 저장 및 관리
-- 사용자 친화적인 인터페이스
+- MediaPipe 기반 손 랜드마크 감지
+- 딥러닝 모델을 통한 정확한 수어 분류
+- 간단한 REST API 인터페이스
+- 시각화된 손 랜드마크 제공
 
 ## 기술 스택
 
-### 프론트엔드 (모바일 앱)
-- React Native
-- React Navigation
-- React Native Camera
-- TTS (Text-to-Speech)
+- **백엔드**: Flask, Python 3.11
+- **ML/DL**: TensorFlow, MediaPipe, OpenCV
+- **데이터베이스**: MongoDB
+- **배포**: Docker, GitHub Actions
 
-### 백엔드
-- Flask (Python)
-- MediaPipe
-- TensorFlow/PyTorch
-- MongoDB
-
-### 인프라
-- Docker
-- GitHub Actions
-- Google Cloud Platform
-
-## 개발 환경 설정
+## 설치 및 실행 방법
 
 ### 필수 요구사항
-- Node.js 14 이상
-- Python 3.8 이상
-- Docker
 
-### 프론트엔드 설정
+- Python 3.11
+- pip
+
+### 설치 방법
+
+1. 저장소 클론
+   ```bash
+   git clone https://github.com/YOUR_USERNAME/sign-language-translator.git
+   cd sign-language-translator
+   ```
+
+2. 가상환경 생성 및 활성화
+   ```bash
+   python -m venv .venv
+   source .venv/bin/activate  # Linux/macOS
+   .\.venv\Scripts\activate   # Windows
+   ```
+
+3. 필요한 패키지 설치
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. 환경 변수 설정
+   ```bash
+   cp .env.example .env
+   # .env 파일을 편집하여 필요한 환경 변수 설정
+   ```
+
+### 실행 방법
 
 ```bash
-# 의존성 설치
-cd frontend
-npm install
-
-# 개발 서버 실행
-npm start
-
-# 안드로이드 빌드
-npm run android
-
-# iOS 빌드
-npm run ios
-```
-
-### 백엔드 설정
-
-```bash
-# 가상 환경 생성 및 활성화
 cd backend
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-
-# 의존성 설치
-pip install -r requirements.txt
-
-# 서버 실행
 python app.py
 ```
 
-### Docker를 이용한 배포
+서버는 기본적으로 http://localhost:5000/ 에서 실행됩니다.
 
-```bash
-# 백엔드 이미지 빌드
-cd backend
-docker build -t sueohaja-backend .
+## API 엔드포인트
 
-# 백엔드 컨테이너 실행
-docker run -d -p 5000:5000 --name sueohaja-backend sueohaja-backend
+### POST /api/translate
+
+수어 이미지를 분석하여 번역 결과를 반환합니다.
+
+**요청 형식**:
+```json
+{
+  "frame": "BASE64_ENCODED_IMAGE_DATA"
+}
 ```
 
-## 인프라 구성 및 배포
+**응답 형식**:
+```json
+{
+  "predicted_word": "안녕하세요",
+  "confidence": 0.95,
+  "annotated_image": "BASE64_ENCODED_IMAGE_WITH_LANDMARKS",
+  "model_used": "bigdata-3team/Sign-Language-Translator"
+}
+```
 
-### 서버 구성
+### GET /api/health
 
-1. Google Cloud Platform에 프로젝트 생성
-2. Cloud Run 또는 App Engine 서비스 설정
-3. MongoDB Atlas 계정 생성 및 클러스터 설정
-4. 환경 변수 구성 (API 키, 데이터베이스 연결 문자열 등)
+서버 상태를 확인합니다.
 
-### CI/CD 파이프라인
+**응답 형식**:
+```json
+{
+  "status": "ok"
+}
+```
 
-GitHub Actions를 통해 자동화된 빌드 및 배포 파이프라인을 구성합니다:
+## 모델 아키텍처
 
-1. `main` 브랜치로 푸시 시 CI/CD 파이프라인 실행
-2. 코드 테스트 및 빌드
-3. Docker 이미지 생성
-4. Google Cloud Platform에 배포
+이 프로젝트에서 사용된 모델은 CNN(Convolutional Neural Network)과 LSTM(Long Short-Term Memory)을 결합한 구조입니다. 이 모델은 다음과 같은 특징을 가집니다:
 
-자세한 구성은 `.github/workflows` 디렉토리에서 확인할 수 있습니다.
+1. **시간적 특성 반영**: 수어는 시간에 따라 변화하는 동작을 포함하므로, 시퀀스 데이터 처리가 필요합니다.
+2. **공간적 특성 반영**: CNN을 통해 이미지의 공간적 특성을 추출합니다.
+3. **TimeDistributed 레이어**: 프레임 시퀀스의 각 프레임에 동일한 처리를 적용합니다.
 
-## 라이선스
+## 라이센스
 
-이 프로젝트는 MIT 라이선스 하에 배포됩니다. 자세한 내용은 [LICENSE](LICENSE) 파일을 참조하세요. 
+이 프로젝트는 MIT 라이센스 하에 배포됩니다. 자세한 내용은 [LICENSE](LICENSE) 파일을 참조하세요. 
