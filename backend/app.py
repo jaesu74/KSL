@@ -22,6 +22,10 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app)
 
+# 데이터 경로 설정
+DATA_PATH = os.getenv('DATA_PATH', os.path.join(os.path.dirname(__file__), 'data', 'sign_data'))
+ANNOTATION_PATH = os.getenv('ANNOTATION_PATH', os.path.join(os.path.dirname(__file__), 'data', 'annotation.xlsx'))
+
 # MongoDB 연결
 def get_mongodb_connection():
     try:
@@ -65,6 +69,7 @@ def load_model():
             model = build_sign_language_model()
             
             # 모델 저장
+            os.makedirs(os.path.dirname(model_path), exist_ok=True)
             model.save(model_path)
             print(f"모델이 {model_path}에 저장되었습니다.")
             

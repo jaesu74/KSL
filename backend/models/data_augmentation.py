@@ -142,7 +142,6 @@ def change_channel_ratio(img, **kwargs):
         assert color in ['r', 'g', 'b'], "Color should be r|g|b"
         assert ratio <= 1, "Ratio should be less than 1."
         ci = 'rgb'.index(color)
-        print(color, ratio)
         img[:, :, ci] *= ratio
     return img
 
@@ -171,12 +170,12 @@ def clipped_zoom(img, zoom_factor, **kwargs):
     pad_h2, pad_w2 = (h - resize_h) - pad_h1, (w - resize_w) - pad_w1
     pad_spec = [(pad_h1, pad_h2), (pad_w1, pad_w2)] + [(0, 0)] * (img.ndim - 2)
 
-    img = cv2.resize(cropped_img, (w, h))
+    img = cv2.resize(cropped_img, (resize_w, resize_h))
     img = np.pad(img, pad_spec, mode='edge')
     return img
 
 
-def apply_data_augmentation (img_seq, process):
+def apply_data_augmentation(img_seq, process):
     """
     :param process: 처리할 항목 리스트 - 1: translate / 2: rotate / 3: gaussian / 4: channel ratio / 5: zoom
     처리할 항목을 받으면 순차적으로 이미지에 변형본 적용
@@ -236,23 +235,26 @@ def apply_data_augmentation (img_seq, process):
     return img_seq
 
 
+# 테스트 코드는 if __name__ == "__main__" 블록 안에 포함
 if __name__ == "__main__":
-    test_img = np.asarray(plt.imread("07.png"))
-    plt.figure(figsize=(5, 5), dpi=100)
-    sns.distplot(test_img[:, :, 0].flatten(), color='maroon')
-    sns.distplot(test_img[:, :, 1].flatten(), color='green')
-    sns.distplot(test_img[:, :, 2].flatten(), color='blue').set_title("RGB Distribution")
-    plt.show()
+    try:
+        test_img = np.asarray(plt.imread("07.png"))
+        plt.figure(figsize=(5, 5), dpi=100)
+        sns.distplot(test_img[:, :, 0].flatten(), color='maroon')
+        sns.distplot(test_img[:, :, 1].flatten(), color='green')
+        sns.distplot(test_img[:, :, 2].flatten(), color='blue').set_title("RGB Distribution")
+        plt.show()
 
-    plot_grid([clipped_zoom(test_img, zoom_factor=1),
-               clipped_zoom(test_img, zoom_factor=1.3),
-               clipped_zoom(test_img, zoom_factor=2),
-               clipped_zoom(test_img, zoom_factor=5),
-               clipped_zoom(test_img, zoom_factor=0.9),
-               clipped_zoom(test_img, zoom_factor=0.8),
-               clipped_zoom(test_img, zoom_factor=0.5),
-               clipped_zoom(test_img, zoom_factor=0.1)],
-              2, 4, figsize=(30, 15))
-    plt.tight_layout()
-    plt.show()
+        plot_grid([clipped_zoom(test_img, zoom_factor=1),
+                clipped_zoom(test_img, zoom_factor=1.3),
+                clipped_zoom(test_img, zoom_factor=2),
+                clipped_zoom(test_img, zoom_factor=5),
+                translate(test_img, shift=30, direction='right'),
+                translate(test_img, shift=30, direction='left'),
+                translate(test_img, shift=30, direction='up'),
+                translate(test_img, shift=30, direction='down')],
+               nrows=2, ncols=4, figsize=(10,5))
+        plt.show()
+    except Exception as e:
+        print(f"테스트 이미지 로드 중 오류 발생: {str(e)}")
 
