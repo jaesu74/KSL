@@ -1,0 +1,57 @@
+version: '3'
+
+services:
+  mongodb:
+    image: mongo:latest
+    container_name: sueorang-mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    restart: always
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_USER}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_PASSWORD}
+    networks:
+      - sueorang-network
+
+  backend:
+    image: ${DOCKER_HUB_USERNAME:-yourusername}/sueorang-backend:latest
+    container_name: sueorang-backend
+    restart: always
+    ports:
+      - "5000:5000"
+    depends_on:
+      - mongodb
+    environment:
+      - MONGO_USER=${MONGO_USER}
+      - MONGO_PASSWORD=${MONGO_PASSWORD}
+      - MONGO_HOST=mongodb
+      - MONGO_PORT=27017
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - FLASK_DEBUG=false
+    networks:
+      - sueorang-network
+
+  nginx:
+    image: nginx:latest
+    container_name: sueorang-nginx
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d
+      - ./nginx/ssl:/etc/nginx/ssl
+      - ./nginx/www:/var/www/html
+    depends_on:
+      - backend
+    networks:
+      - sueorang-network
+
+volumes:
+  mongodb_data:
+
+networks:
+  sueorang-network:
+    driver: bridge 

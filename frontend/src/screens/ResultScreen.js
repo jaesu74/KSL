@@ -3,230 +3,422 @@ import {
   View,
   Text,
   StyleSheet,
+  Image,
   TouchableOpacity,
-  ScrollView,
+  Share,
   ActivityIndicator,
   Alert,
+  ScrollView,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import Tts from 'react-native-tts';
+import { LinearGradient } from 'expo-linear-gradient';
+import theme from '../config/theme';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from 'axios';
+import { API_URL } from '../config/api';
+import * as Speech from 'expo-speech';
 
 const ResultScreen = ({ route, navigation }) => {
-  const { result } = route.params || { result: '' };
-  const [translatedText, setTranslatedText] = useState(result);
-  const [isSpeaking, setIsSpeaking] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const { result, annotatedImage } = route.params;
+  const [isSaved, setIsSaved] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [gender, setGender] = useState('female');
+  const [loading, setLoading] = useState(false);
+  const [translationId, setTranslationId] = useState(null);
+  const [userToken, setUserToken] = useState(null);
 
-  // TTS 초기화
   useEffect(() => {
-    Tts.setDefaultLanguage('ko-KR');
-    Tts.addEventListener('tts-start', () => setIsSpeaking(true));
-    Tts.addEventListener('tts-finish', () => setIsSpeaking(false));
-    Tts.addEventListener('tts-cancel', () => setIsSpeaking(false));
-
-    return () => {
-      Tts.stop();
-      Tts.removeAllListeners('tts-start');
-      Tts.removeAllListeners('tts-finish');
-      Tts.removeAllListeners('tts-cancel');
-    };
+    // 결과 로드 시 사용자 설정 및 번역 정보 가져오기
+    loadUserInfo();
+    saveTranslationToHistory();
   }, []);
 
+  const loadUserInfo = async () => {
+    try {
+      const userData = await AsyncStorage.getItem('userData');
+      const token = await AsyncStorage.getItem('userToken');
+      
+      if (userData) {
+        const parsedData = JSON.parse(userData);
+        setGender(parsedData.gender || 'female');
+      }
+      
+      if (token) {
+        setUserToken(token);
+      }
+    } catch (error) {
+      console.error('사용자 정보 로드 오류:', error);
+    }
+  };
+
+  // 번역 결과를 히스토리에 저장
+  const saveTranslationToHistory = async () => {
+    try {
+      setLoading(true);
+      
+      // 로컬 저장
+      const now = new Date();
+      const translationItem = {
+        id: now.getTime().toString(),
+        word: result,
+        image: annotatedImage,
+        date: now.toLocaleDateString(),
+        time: now.toLocaleTimeString(),
+        isSaved: false,
+      };
+      
+      setTranslationId(translationItem.id);
+      
+      // 이전 번역 내역 가져오기
+      const existingData = await AsyncStorage.getItem('recentTranslations');
+      let translations = [];
+      
+      if (existingData) {
+        translations = JSON.parse(existingData);
+      }
+      
+      // 최근 항목을 앞에 추가 (최대 20개 유지)
+      translations = [translationItem, ...translations];
+      if (translations.length > 20) {
+        translations = translations.slice(0, 20);
+      }
+      
+      await AsyncStorage.setItem('recentTranslations', JSON.stringify(translations));
+      
+      // 서버에도 저장
+      if (userToken) {
+        const response = await axios.post(
+          `${API_URL}/api/translations`,
+          {
+            word: result,
+            image: annotatedImage
+          },
+          { headers: { Authorization: `Bearer ${userToken}` } }
+        );
+        
+        if (response.data.id) {
+          setTranslationId(response.data.id);
+        }
+      }
+    } catch (error) {
+      console.error('번역 저장 오류:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 번역 결과 저장 상태 토글
+  const toggleSaveStatus = async () => {
+    try {
+      setIsSaved(!isSaved);
+      
+      // 로컬 저장소 업데이트
+      const existingData = await AsyncStorage.getItem('recentTranslations');
+      if (existingData) {
+        let translations = JSON.parse(existingData);
+        
+        translations = translations.map((item) => {
+          if (item.id === translationId) {
+            return { ...item, isSaved: !isSaved };
+          }
+          return item;
+        });
+        
+        await AsyncStorage.setItem('recentTranslations', JSON.stringify(translations));
+      }
+      
+      // 서버 저장 상태 업데이트
+      if (userToken && translationId) {
+        await axios.post(
+          `${API_URL}/api/translations/${translationId}/toggle-save`,
+          {},
+          { headers: { Authorization: `Bearer ${userToken}` } }
+        );
+      }
+      
+      // 저장 목록 업데이트
+      const savedData = await AsyncStorage.getItem('savedSigns');
+      let savedSigns = [];
+      
+      if (savedData) {
+        savedSigns = JSON.parse(savedData);
+      }
+      
+      if (!isSaved) {
+        // 저장 목록에 추가
+        const newSavedSign = {
+          id: translationId,
+          word: result,
+          image: annotatedImage,
+          savedAt: new Date().toLocaleDateString(),
+        };
+        
+        savedSigns = [newSavedSign, ...savedSigns];
+        await AsyncStorage.setItem('savedSigns', JSON.stringify(savedSigns));
+        
+        Alert.alert('저장 완료', '번역 결과가 저장되었습니다.');
+      } else {
+        // 저장 목록에서 제거
+        savedSigns = savedSigns.filter(sign => sign.id !== translationId);
+        await AsyncStorage.setItem('savedSigns', JSON.stringify(savedSigns));
+        
+        Alert.alert('저장 취소', '번역 결과 저장이 취소되었습니다.');
+      }
+    } catch (error) {
+      console.error('저장 상태 변경 오류:', error);
+      setIsSaved(!isSaved); // 실패 시 상태 되돌리기
+    }
+  };
+
   // 음성 재생
-  const speakText = () => {
-    if (translatedText.trim() === '') {
-      Alert.alert('알림', '읽을 텍스트가 없습니다.');
-      return;
-    }
-
-    if (isSpeaking) {
-      Tts.stop();
-    } else {
-      Tts.speak(translatedText);
+  const playAudio = async () => {
+    try {
+      setIsPlaying(true);
+      
+      // expo-speech를 사용한 TTS
+      const voiceOptions = {
+        language: 'ko-KR',
+        pitch: 1.0,
+        rate: 0.8,
+        // gender에 따라 voice 설정 (iOS만 지원, Android는 기본 음성 사용)
+        voice: gender === 'female' ? 'com.apple.ttsbundle.Yuna-compact' : 'com.apple.ttsbundle.Hattori-compact',
+      };
+      
+      Speech.speak(result, {
+        ...voiceOptions,
+        onDone: () => setIsPlaying(false),
+        onError: () => {
+          console.error('TTS 오류 발생');
+          setIsPlaying(false);
+        }
+      });
+    } catch (error) {
+      console.error('음성 재생 오류:', error);
+      setIsPlaying(false);
     }
   };
 
-  // 텍스트 복사
-  const copyToClipboard = () => {
-    if (translatedText.trim() === '') {
-      Alert.alert('알림', '복사할 텍스트가 없습니다.');
-      return;
+  // 공유 기능
+  const shareResult = async () => {
+    try {
+      await Share.share({
+        message: `수어랑에서 번역한 내용: ${result}`,
+      });
+    } catch (error) {
+      console.error('공유 오류:', error);
     }
-
-    // 실제 구현에서는 Clipboard 모듈 사용
-    Alert.alert('성공', '텍스트가 클립보드에 복사되었습니다.');
   };
 
-  // 번역 결과 재시도
-  const retryTranslation = () => {
-    navigation.goBack();
+  // 다시 번역하기
+  const translateAgain = () => {
+    navigation.navigate('번역하기');
   };
 
   return (
-    <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.contentContainer}>
-        <View style={styles.resultCard}>
-          <Text style={styles.resultTitle}>번역 결과</Text>
-          
-          {isLoading ? (
-            <ActivityIndicator size="large" color="#4A90E2" />
-          ) : (
-            <>
-              <Text style={styles.resultText}>{translatedText}</Text>
+    <ScrollView style={styles.container}>
+      <LinearGradient
+        colors={theme.colors.gradient.background}
+        style={styles.headerGradient}
+      >
+        <Text style={styles.headerTitle}>번역 결과</Text>
+      </LinearGradient>
+      
+      <View style={styles.content}>
+        {loading ? (
+          <ActivityIndicator size="large" color={theme.colors.primary} style={styles.loader} />
+        ) : (
+          <>
+            <View style={styles.resultCard}>
+              <LinearGradient
+                colors={theme.colors.gradient.primary}
+                style={styles.resultHeader}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+              >
+                <Text style={styles.resultHeaderText}>인식된 수어</Text>
+              </LinearGradient>
               
-              <View style={styles.buttonContainer}>
-                <TouchableOpacity
-                  style={styles.actionButton}
-                  onPress={speakText}
-                >
-                  <Icon
-                    name={isSpeaking ? 'volume-mute' : 'volume-high'}
-                    size={24}
-                    color="#4A90E2"
-                  />
-                  <Text style={styles.actionButtonText}>
-                    {isSpeaking ? '음성 중지' : '음성으로 듣기'}
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.actionButton}
-                  onPress={copyToClipboard}
-                >
-                  <Icon name="copy-outline" size={24} color="#4A90E2" />
-                  <Text style={styles.actionButtonText}>텍스트 복사</Text>
-                </TouchableOpacity>
+              <View style={styles.resultContent}>
+                <Text style={styles.resultText}>{result}</Text>
+                
+                <View style={styles.actionButtons}>
+                  <TouchableOpacity 
+                    style={styles.actionButton}
+                    onPress={toggleSaveStatus}
+                  >
+                    <Icon 
+                      name={isSaved ? "bookmark" : "bookmark-outline"} 
+                      size={24} 
+                      color={isSaved ? theme.colors.primary : theme.colors.textSecondary} 
+                    />
+                    <Text style={[
+                      styles.actionButtonText,
+                      isSaved && { color: theme.colors.primary }
+                    ]}>
+                      {isSaved ? '저장됨' : '저장'}
+                    </Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity 
+                    style={styles.actionButton}
+                    onPress={playAudio}
+                    disabled={isPlaying}
+                  >
+                    <Icon 
+                      name={isPlaying ? "volume-high" : "volume-high-outline"} 
+                      size={24} 
+                      color={isPlaying ? theme.colors.primary : theme.colors.textSecondary} 
+                    />
+                    <Text style={[
+                      styles.actionButtonText,
+                      isPlaying && { color: theme.colors.primary }
+                    ]}>
+                      {isPlaying ? '재생 중...' : '읽기'}
+                    </Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity 
+                    style={styles.actionButton}
+                    onPress={shareResult}
+                  >
+                    <Icon name="share-social-outline" size={24} color={theme.colors.textSecondary} />
+                    <Text style={styles.actionButtonText}>공유</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
-            </>
-          )}
-        </View>
-
-        <View style={styles.historySection}>
-          <Text style={styles.sectionTitle}>최근 번역 기록</Text>
-          {/* 실제 구현에서는 AsyncStorage 등을 사용해 기록 저장 및 표시 */}
-          <Text style={styles.emptyText}>번역 기록이 없습니다.</Text>
-        </View>
-      </ScrollView>
-
-      <View style={styles.bottomButtonContainer}>
-        <TouchableOpacity
-          style={styles.bottomButton}
-          onPress={retryTranslation}
-        >
-          <Icon name="refresh" size={20} color="white" />
-          <Text style={styles.bottomButtonText}>다시 번역하기</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.bottomButton, styles.homeButton]}
-          onPress={() => navigation.navigate('홈')}
-        >
-          <Icon name="home" size={20} color="white" />
-          <Text style={styles.bottomButtonText}>홈으로</Text>
-        </TouchableOpacity>
+            </View>
+            
+            {annotatedImage && (
+              <View style={styles.imageCard}>
+                <Text style={styles.imageTitle}>손 인식 결과</Text>
+                <Image
+                  source={{ uri: annotatedImage }}
+                  style={styles.resultImage}
+                  resizeMode="contain"
+                />
+              </View>
+            )}
+            
+            <TouchableOpacity
+              style={styles.translateAgainButton}
+              onPress={translateAgain}
+            >
+              <LinearGradient
+                colors={theme.colors.gradient.secondary}
+                style={styles.translateAgainGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+              >
+                <Icon name="camera-outline" size={20} color="#FFF" />
+                <Text style={styles.translateAgainText}>다시 번역하기</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </>
+        )}
       </View>
-    </View>
+    </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F7F9FC',
+    backgroundColor: theme.colors.background,
   },
-  contentContainer: {
+  headerGradient: {
+    paddingTop: 50,
+    paddingBottom: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: theme.colors.text,
+  },
+  content: {
+    flex: 1,
     padding: 20,
+  },
+  loader: {
+    marginTop: 50,
   },
   resultCard: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 20,
+    backgroundColor: theme.colors.backgroundLight,
+    borderRadius: 16,
+    overflow: 'hidden',
     marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    ...theme.styles.shadow,
   },
-  resultTitle: {
-    fontSize: 18,
+  resultHeader: {
+    padding: 16,
+    alignItems: 'center',
+  },
+  resultHeaderText: {
+    color: '#FFF',
+    fontSize: 16,
     fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 15,
+  },
+  resultContent: {
+    padding: 20,
   },
   resultText: {
     fontSize: 24,
-    color: '#111',
-    padding: 15,
-    backgroundColor: '#F9F9F9',
-    borderRadius: 8,
-    minHeight: 100,
-    textAlignVertical: 'center',
+    color: theme.colors.text,
+    textAlign: 'center',
+    marginBottom: 20,
+    lineHeight: 36,
   },
-  buttonContainer: {
+  actionButtons: {
     flexDirection: 'row',
-    marginTop: 20,
     justifyContent: 'space-around',
+    marginTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.border,
+    paddingTop: 20,
   },
   actionButton: {
-    flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F0F7FF',
-    padding: 10,
-    borderRadius: 8,
   },
   actionButtonText: {
-    color: '#4A90E2',
-    marginLeft: 8,
-    fontWeight: '500',
+    color: theme.colors.textSecondary,
+    marginTop: 5,
+    fontSize: 12,
   },
-  historySection: {
-    backgroundColor: 'white',
-    borderRadius: 12,
+  imageCard: {
+    backgroundColor: theme.colors.backgroundLight,
+    borderRadius: 16,
     padding: 20,
     marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    ...theme.styles.shadow,
   },
-  sectionTitle: {
-    fontSize: 18,
+  imageTitle: {
+    color: theme.colors.text,
+    fontSize: 16,
     fontWeight: 'bold',
-    color: '#333',
     marginBottom: 15,
   },
-  emptyText: {
-    color: '#999',
-    fontStyle: 'italic',
-    textAlign: 'center',
-    padding: 20,
-  },
-  bottomButtonContainer: {
-    flexDirection: 'row',
-    padding: 16,
-    backgroundColor: 'white',
-    borderTopWidth: 1,
-    borderTopColor: '#EFEFEF',
-  },
-  bottomButton: {
-    flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#4A90E2',
+  resultImage: {
+    width: '100%',
+    height: 200,
     borderRadius: 8,
-    paddingVertical: 12,
-    marginHorizontal: 8,
   },
-  homeButton: {
-    backgroundColor: '#6C7A89',
+  translateAgainButton: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginVertical: 10,
   },
-  bottomButtonText: {
-    color: 'white',
+  translateAgainGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+  },
+  translateAgainText: {
+    color: '#FFF',
+    fontSize: 16,
     fontWeight: 'bold',
-    marginLeft: 8,
+    marginLeft: 10,
   },
 });
 

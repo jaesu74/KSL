@@ -26,6 +26,15 @@ CORS(app)
 DATA_PATH = os.getenv('DATA_PATH', os.path.join(os.path.dirname(__file__), 'data', 'sign_data'))
 ANNOTATION_PATH = os.getenv('ANNOTATION_PATH', os.path.join(os.path.dirname(__file__), 'data', 'annotation.xlsx'))
 
+# 라우터 등록
+from routes.auth import auth_bp
+from routes.translations import translations_bp
+from routes.signs import signs_bp
+
+app.register_blueprint(auth_bp, url_prefix='/api/auth')
+app.register_blueprint(translations_bp, url_prefix='/api/translations')
+app.register_blueprint(signs_bp, url_prefix='/api/signs')
+
 # MongoDB 연결
 def get_mongodb_connection():
     try:
@@ -248,50 +257,66 @@ def process_sign_language(frame_data):
             
             # 모델 입력 형태로 변환
             img_seq = img_seq.reshape(1, seq_len, 67, 120, 3)
-            img_seq = img_seq.astype(np.float32)
             
             # 모델 예측
-            predictions = model.predict(img_seq)
-            predicted_idx = np.argmax(predictions, axis=1)[0]
+            prediction = model.predict(img_seq)[0]
             
-            # 예측된 단어 찾기
-            predicted_word = "알 수 없는 수어"
-            for word, idx in word_dict.items():
-                if idx == predicted_idx:
-                    predicted_word = word
-                    break
+            # 예측된 인덱스를 단어로 변환
+            # 단어 사전 반전 (인덱스 -> 단어)
+            idx_word_dict = {v: k for k, v in word_dict.items()}
+            
+            # 가장 높은 확률의 클래스 인덱스 찾기
+            predicted_idx = np.argmax(prediction)
+            predicted_word = idx_word_dict.get(predicted_idx, "알 수 없는 수어")
+            confidence = float(prediction[predicted_idx])
             
             # 시각화 이미지를 Base64로 인코딩
             _, buffer = cv2.imencode('.jpg', annotated_frame)
             annotated_image = base64.b64encode(buffer).decode('utf-8')
             
-            confidence = float(predictions[0][predicted_idx]) * 100
-            
             return {
                 "predicted_word": predicted_word,
-                "confidence": f"{confidence:.2f}%",
+                "confidence": confidence,
                 "annotated_image": f"data:image/jpeg;base64,{annotated_image}",
-                "model_used": "딥러닝 모델"
+                "model_used": "CNN+LSTM 기반 딥러닝 모델"
             }
         else:
-            return {"error": "손을 인식할 수 없습니다."}
+            return {
+                "error": "손 랜드마크를 찾을 수 없습니다.",
+                "message": "화면에 손이 보이도록 위치시켜 주세요."
+            }
     except Exception as e:
-        return {"error": f"처리 중 오류 발생: {str(e)}"}
+        print(f"수어 처리 오류: {e}")
+        return {
+            "error": f"처리 중 오류가 발생했습니다: {str(e)}"
+        }
 
+# 수어 번역 API
 @app.route('/api/translate', methods=['POST'])
-def translate_sign():
-    if 'frame' not in request.json:
-        return jsonify({"error": "프레임 데이터가 없습니다."}), 400
-    
-    frame_data = request.json['frame']
-    result = process_sign_language(frame_data)
-    
-    return jsonify(result)
+def translate():
+    try:
+        data = request.json
+        if not data or 'frame' not in data:
+            return jsonify({
+                "error": "프레임 데이터가 없습니다."
+            }), 400
+        
+        result = process_sign_language(data['frame'])
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({
+            "error": f"요청 처리 중 오류가 발생했습니다: {str(e)}"
+        }), 500
 
+# 서버 상태 확인 API
 @app.route('/api/health', methods=['GET'])
 def health_check():
-    return jsonify({"status": "ok"})
+    return jsonify({
+        "status": "ok",
+        "version": "1.0.0"
+    })
 
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=True) 
+# 메인 실행
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=os.environ.get('FLASK_DEBUG', 'False').lower() == 'true') 
