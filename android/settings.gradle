@@ -1,0 +1,5 @@
+rootProject.name = 'SueoHaja'
+
+// 간단한 설정으로 변경
+include ':app'
+// includeBuild('../node_modules/react-native-gradle-plugin') // 존재하지 않는 모듈이므로 주석 처리 

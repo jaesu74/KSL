@@ -1,0 +1,39 @@
+// Top-level build file where you can add configuration options common to all sub-projects/modules.
+
+buildscript {
+    ext {
+        buildToolsVersion = "33.0.0"
+        minSdkVersion = 21
+        compileSdkVersion = 33
+        targetSdkVersion = 33
+        ndkVersion = "25.1.8937393"
+        androidXAnnotation = "1.6.0"
+        androidXBrowser = "1.5.0"
+        // 다른 버전들은 필요에 따라 추가하세요
+    }
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath('com.android.tools.build:gradle:8.8.0')
+        // classpath("com.facebook.react:react-native-gradle-plugin") // 존재하지 않는 모듈이므로 주석 처리
+    }
+}
+
+allprojects {
+    repositories {
+        maven {
+            // React Native를 포함하는 모든 네이티브 모듈(examples/android/your-app)에 대한
+            // 일반적인 설정입니다.
+            url("$rootDir/../node_modules/react-native/android")
+        }
+        maven {
+            // Android JSC는 여기에서 배포됩니다.
+            url("$rootDir/../node_modules/jsc-android/dist")
+        }
+        google()
+        mavenCentral()
+        maven { url 'https://www.jitpack.io' }
+    }
+} 

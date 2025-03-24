@@ -1,0 +1,27 @@
+<resources>
+    <!-- Base application theme. -->
+    <style name="AppTheme" parent="Theme.MaterialComponents.Light.NoActionBar">
+        <!-- Customize your theme here. -->
+        <item name="colorPrimary">@color/warm_primary</item>
+        <item name="colorPrimaryDark">@color/primary_dark</item>
+        <item name="colorAccent">@color/warm_accent</item>
+        <item name="android:windowBackground">@color/warm_background</item>
+        <item name="android:textColorPrimary">@color/warm_text_primary</item>
+        <item name="android:textColorSecondary">@color/warm_text_secondary</item>
+        <item name="materialButtonStyle">@style/WarmButtonStyle</item>
+        <item name="textInputStyle">@style/WarmTextInputStyle</item>
+    </style>
+    
+    <style name="WarmButtonStyle" parent="Widget.MaterialComponents.Button">
+        <item name="backgroundTint">@color/warm_primary</item>
+        <item name="android:textColor">@color/white</item>
+        <item name="android:padding">12dp</item>
+        <item name="cornerRadius">8dp</item>
+        <item name="android:elevation">2dp</item>
+    </style>
+    
+    <style name="WarmTextInputStyle" parent="Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+        <item name="boxStrokeColor">@color/warm_primary</item>
+        <item name="hintTextColor">@color/warm_primary</item>
+    </style>
+</resources> 

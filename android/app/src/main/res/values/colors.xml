@@ -1,0 +1,25 @@
+<resources>
+    <!-- 테마 기본 색상 -->
+    <color name="primary">#5D6DBE</color>
+    <color name="primary_dark">#3F51B5</color>
+    <!-- 사용되지 않는 색상: 필요시 주석 해제 -->
+    <!-- <color name="primary_light">#C5CAE9</color> -->
+    <!-- <color name="accent">#FF4081</color> -->
+    <!-- <color name="white">#FFFFFF</color> -->
+    <color name="gray">#CCCCCC</color>
+    
+    <!-- 따뜻한 색상 -->
+    <color name="warm_background">#FFF9F5</color>
+    <color name="warm_accent">#FFB74D</color>
+    <color name="warm_primary">#FF9800</color>
+    <color name="warm_secondary">#FFE0B2</color>
+    <color name="warm_text_primary">#4E342E</color>
+    <color name="warm_text_secondary">#8D6E63</color>
+    
+    <!-- 기본 색상 -->
+    <color name="white">#FFFFFF</color>
+    <color name="black">#000000</color>
+    <color name="transparent">#00000000</color>
+    <color name="translucent_white">#DDFFFFFF</color>
+    <color name="translucent_black">#55000000</color>
+</resources> 
